@@ -59,7 +59,7 @@ class XLogger {
   }
 
   ///返回给定时间对应的日志文件地址
-  static Future<File> getLogFile(DateTime date) async {
+  static Future<File> getLog(DateTime date) async {
     String time = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
     final String path = await _FlutterLogan.getUploadPath(time);
     return File(path);
@@ -67,10 +67,10 @@ class XLogger {
 
   static Future<List<File>> getAllLogs() async {
     final List<String> paths = await _FlutterLogan.getAllLogs();
-    List<File> fileList=[];
-    for(var s in paths){
-      File file=File(s);
-      if(file.existsSync()){
+    List<File> fileList = [];
+    for (var s in paths) {
+      File file = File(s);
+      if (file.existsSync()) {
         fileList.add(file);
       }
     }
@@ -113,7 +113,7 @@ class XLogger {
       return;
     }
     if (_filter != null) {
-      bool filt = _filter!.filter(level, content,tag);
+      bool filt = _filter!.filter(level, content, tag);
       if (filt) {
         return;
       }
@@ -235,7 +235,7 @@ class XLogger {
 }
 
 abstract class PrintFilter {
-  bool filter(Level level, dynamic content,String? tag);
+  bool filter(Level level, dynamic content, String? tag);
 }
 
 enum Level { V, D, I, W, E }
@@ -278,8 +278,16 @@ class _FlutterLogan {
   }
 
   static Future<List<String>> getAllLogs() async {
-    final List<String> result = await _channel.invokeMethod('getAllLogs');
-    return result;
+    final List<Object?> result = await _channel.invokeMethod('getAllLogs');
+    List<String> list = [];
+    for (int i = 0; i < result.length; i++) {
+      Object? obj = result[i];
+      if (obj == null) {
+        continue;
+      }
+      list.add(obj.toString());
+    }
+    return list;
   }
 
   static Future<bool> upload(String serverUrl, String date, String appId, String unionId, String deviceId) async {

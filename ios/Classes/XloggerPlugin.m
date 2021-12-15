@@ -1,19 +1,18 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
-#import "FlutterLoganPlugin.h"
+#import "XloggerPlugin.h"
 #import "Logan.h"
 
-@implementation FlutterLoganPlugin
+@implementation XloggerPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   FlutterMethodChannel* channel = [FlutterMethodChannel
       methodChannelWithName:@"flutter_logan"
             binaryMessenger:[registrar messenger]];
-  FlutterLoganPlugin* instance = [[FlutterLoganPlugin alloc] init];
+  XloggerPlugin* instance = [[XloggerPlugin alloc] init];
   [registrar addMethodCallDelegate:instance channel:channel];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-	NSLog(@"call method %@ args=%@",call.method,call.arguments);
 	SEL sel = NSSelectorFromString([call.method stringByAppendingString:@":result:"]);
 	if(sel && [self respondsToSelector:sel]){
 		((void(*)(id,SEL,...))objc_msgSend)(self,sel,call.arguments,result);
@@ -70,24 +69,22 @@
 }
 
 - (void)getAllLogs:(NSDictionary *)args result:(FlutterResult)result{
-	if(![args isKindOfClass:[NSDictionary class]]){
-		result(@"");
-		return;
-	}
-	NSFileManager *myFileManager = [NSFileManager defaultManager];
-	NSDirectoryEnumerator *dir = [myFileManager enumeratorAtPath:filePath];
-    NSMutableArray *array = [NSMutabeArray arrayWithCapacity:10];
-
-    for (NSString *path in myDirectoryEnumerator.allObjects) {
-        isExist = [myFileManager fileExistsAtPath:[NSString stringWithFormat:@"%@/%@", filePath, path] isDirectory:&isDir];
-            if (isDir) {
-            } else {
-            [array addObject:@path];
-            }
-        }
-        result(@array);
+    NSDictionary *files= loganAllFilesInfo();
+    if(files.count<=0){
+        result([NSArray array]);
+        return;
     }
-
+    NSMutableArray<NSString *> *array = [NSMutableArray arrayWithCapacity:1];
+    for (NSString *dateKey in files.allKeys) {
+        loganUploadFilePath(dateKey,^(NSString * _Nullable filePath){
+            [array addObject:filePath];
+            //到了最后才回调
+            if(array.count==files.count){
+                NSArray<NSString *> *array2 = [ array copy];
+                result(array2);
+            }
+        });
+    }
 }
 
 - (void)upload:(NSDictionary *)args result:(FlutterResult)result{
@@ -113,7 +110,5 @@
 	loganClearAllLogs();
 	result(nil);
 }
-
-
 
 @end

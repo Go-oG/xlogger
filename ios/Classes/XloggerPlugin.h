@@ -1,3 +1,3 @@
 #import <Flutter/Flutter.h>
-@interface FlutterLoganPlugin : NSObject<FlutterPlugin>
+@interface XloggerPlugin : NSObject<FlutterPlugin>
 @end
