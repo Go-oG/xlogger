@@ -69,6 +69,27 @@
 	}
 }
 
+- (void)getAllLogs:(NSDictionary *)args result:(FlutterResult)result{
+	if(![args isKindOfClass:[NSDictionary class]]){
+		result(@"");
+		return;
+	}
+	NSFileManager *myFileManager = [NSFileManager defaultManager];
+	NSDirectoryEnumerator *dir = [myFileManager enumeratorAtPath:filePath];
+    NSMutableArray *array = [NSMutabeArray arrayWithCapacity:10];
+
+    for (NSString *path in myDirectoryEnumerator.allObjects) {
+        isExist = [myFileManager fileExistsAtPath:[NSString stringWithFormat:@"%@/%@", filePath, path] isDirectory:&isDir];
+            if (isDir) {
+            } else {
+            [array addObject:@path];
+            }
+        }
+        result(@array);
+    }
+
+}
+
 - (void)upload:(NSDictionary *)args result:(FlutterResult)result{
 	if(![args isKindOfClass:[NSDictionary class]]){
 		result(@NO);

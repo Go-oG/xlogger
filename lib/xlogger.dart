@@ -1,22 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:stack_trace/stack_trace.dart';
 
 class XLogger {
   static const _lineMax = 4 * 1024 - 500;
-
   static const _topLeftCorner = '┌';
   static const _bottomLeftCorner = '└';
   static const _middleCorner = '├';
   static const _verticalLine = '│';
   static const _doubleDivider = '─';
   static const _singleDivider = '┄';
-
   static bool _enable = true;
   static const _encoder = JsonEncoder.withIndent(null);
 
+  static PrintFilter? _filter;
   static _LogColor _colorV = _LogColor.rgb(187, 187, 187);
   static _LogColor _colorD = _LogColor.rgb(37, 188, 36);
   static _LogColor _colorI = _LogColor.rgb(255, 255, 0);
@@ -50,44 +50,85 @@ class XLogger {
     }
   }
 
-  static void v(String tag, dynamic content, {bool saveToFile = false}) {
+  static void setFilter(PrintFilter? filter) {
+    _filter = filter;
+  }
+
+  static void init(String aseKey, String aesIv, {int maxFileLen = 2 * 1024 * 1024 * 1024}) {
+    _FlutterLogan.init(aseKey, aesIv, maxFileLen);
+  }
+
+  ///返回给定时间对应的日志文件地址
+  static Future<File> getLogFile(DateTime date) async {
+    String time = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final String path = await _FlutterLogan.getUploadPath(time);
+    return File(path);
+  }
+
+  static Future<List<File>> getAllLogs() async {
+    final List<String> paths = await _FlutterLogan.getAllLogs();
+    List<File> fileList=[];
+    for(var s in paths){
+      File file=File(s);
+      if(file.existsSync()){
+        fileList.add(file);
+      }
+    }
+    return Future.value(fileList);
+  }
+
+  static Future<void> flush() async {
+    await _FlutterLogan.flush();
+  }
+
+  static Future<void> cleanAllLogs() async {
+    await _FlutterLogan.cleanAllLogs();
+  }
+
+  static void v(dynamic content, {bool saveToFile = false, String? tag}) {
     _printLog(Level.V, tag, content, saveToFile);
   }
 
-  static void d(String tag, dynamic content, {bool saveToFile = false}) {
+  static void d(dynamic content, {bool saveToFile = false, String? tag}) {
     _printLog(Level.D, tag, content, saveToFile);
   }
 
-  static void i(String tag, dynamic content, {bool saveToFile = false}) {
+  static void i(dynamic content, {bool saveToFile = false, String? tag}) {
     _printLog(Level.I, tag, content, saveToFile);
   }
 
-  static void w(String tag, dynamic content, {bool saveToFile = false}) {
+  static void w(dynamic content, {bool saveToFile = false, String? tag}) {
     _printLog(Level.W, tag, content, saveToFile);
   }
 
-  static void e(String tag, dynamic content, {bool saveToFile = false}) {
+  static void e(dynamic content, {bool saveToFile = false, String? tag}) {
     _printLog(Level.E, tag, content, saveToFile);
   }
 
-  static void _printLog(Level level, String tag, dynamic content, bool saveToFile) {
-    if (_enable) {
-      String color = _colorD.getHead();
-      if (level == Level.V) {
-        color = _colorV.getHead();
-      } else if (level == Level.I) {
-        color = _colorI.getHead();
-      } else if (level == Level.W) {
-        color = _colorW.getHead();
-      } else if (level == Level.E) {
-        color = _colorE.getHead();
-      }
-      _printDetail(_convertLog(_stringifyMessage(content)), color);
-    }
-
+  static void _printLog(Level level, String? tag, dynamic content, bool saveToFile) {
     if (saveToFile) {
       _FlutterLogan.log(1, content);
     }
+    if (!_enable) {
+      return;
+    }
+    if (_filter != null) {
+      bool filt = _filter!.filter(level, content,tag);
+      if (filt) {
+        return;
+      }
+    }
+    String color = _colorD.getHead();
+    if (level == Level.V) {
+      color = _colorV.getHead();
+    } else if (level == Level.I) {
+      color = _colorI.getHead();
+    } else if (level == Level.W) {
+      color = _colorW.getHead();
+    } else if (level == Level.E) {
+      color = _colorE.getHead();
+    }
+    _printDetail(_convertLog(_stringifyMessage(content)), color);
   }
 
   //转为字符串
@@ -142,8 +183,8 @@ class XLogger {
       final frame = frames[idx];
       staceInfo = "${frame.library}(${frame.line})";
     }
-    if(staceInfo.length>lineMaxCount){
-      lineMaxCount=staceInfo.length;
+    if (staceInfo.length > lineMaxCount) {
+      lineMaxCount = staceInfo.length;
     }
 
     //数据拼接
@@ -193,6 +234,12 @@ class XLogger {
   }
 }
 
+abstract class PrintFilter {
+  bool filter(Level level, dynamic content,String? tag);
+}
+
+enum Level { V, D, I, W, E }
+
 class _LogColor {
   static const ansiEsc = '\x1B[38;2;';
   static const ansiDefault = '\x1B[0m';
@@ -213,8 +260,6 @@ class _LogColor {
   }
 }
 
-enum Level { V, D, I, W, E }
-
 class _FlutterLogan {
   static const MethodChannel _channel = MethodChannel('flutter_logan');
 
@@ -229,6 +274,11 @@ class _FlutterLogan {
 
   static Future<String> getUploadPath(String date) async {
     final String result = await _channel.invokeMethod('getUploadPath', {'date': date});
+    return result;
+  }
+
+  static Future<List<String>> getAllLogs() async {
+    final List<String> result = await _channel.invokeMethod('getAllLogs');
     return result;
   }
 

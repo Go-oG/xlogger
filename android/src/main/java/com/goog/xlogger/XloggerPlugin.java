@@ -11,6 +11,8 @@ import com.dianping.logan.LoganConfig;
 import com.dianping.logan.Util;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -53,11 +55,11 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_logan");
         channel.setMethodCallHandler(new XloggerPlugin());
     }
-    
+
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-        mContext=binding.getApplicationContext();
+        mContext = binding.getApplicationContext();
         channel = new MethodChannel(binding.getBinaryMessenger(), "flutter_logan");
         channel.setMethodCallHandler(this);
     }
@@ -92,6 +94,9 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
             case "cleanAllLogs":
                 cleanAllLog(result);
                 break;
+            case "getAllLogs":
+                getAllLogs(result);
+                break;
             default:
                 result.notImplemented();
                 break;
@@ -99,12 +104,7 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
     }
 
     private void replyOnMainThread(final Result result, final Object r) {
-        sMainExecutor.execute(new Runnable() {
-            @Override
-            public void run() {
-                result.success(r);
-            }
-        });
+        sMainExecutor.execute(() -> result.success(r));
     }
 
     private void loganInit(Object args, Result result) {
@@ -159,12 +159,7 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
         if (sExecutor == null) {
             synchronized (this) {
                 if (sExecutor == null) {
-                    sExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "flutter-plugin-thread");
-                        }
-                    });
+                    sExecutor = Executors.newSingleThreadExecutor(r -> new Thread(r, "flutter-plugin-thread"));
                 }
             }
         }
@@ -209,6 +204,32 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
                 }
             }
             replyOnMainThread(result, "");
+        });
+    }
+
+    //获取所有的日志文件
+    private void getAllLogs(Result result) {
+        if (Utils.isEmpty(mLoganFilePath)) {
+            result.success("");
+            return;
+        }
+        checkAndInitExecutor();
+        sExecutor.execute(() -> {
+            File dir = new File(mLoganFilePath);
+            if (!dir.exists()) {
+                replyOnMainThread(result, "");
+                return;
+            }
+            File[] files = dir.listFiles();
+            if (files == null) {
+                replyOnMainThread(result, "");
+                return;
+            }
+            List<String> pathList=new ArrayList<>();
+            for (File file : files) {
+                pathList.add(file.getAbsolutePath());
+            }
+            replyOnMainThread(result, pathList);
         });
     }
 
