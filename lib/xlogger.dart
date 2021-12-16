@@ -2,21 +2,24 @@ library xlogger;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:stack_trace/stack_trace.dart';
 
 class XLogger {
-  static const _lineMax = 4 * 1024 - 500;
+  static const _lineMax = 3 * 1024; //一行最多好多个字符(用于处理)
   static const _topLeftCorner = '┌';
   static const _bottomLeftCorner = '└';
   static const _middleCorner = '├';
   static const _verticalLine = '│';
   static const _doubleDivider = '─';
   static const _singleDivider = '┄';
+
   static bool _enable = true;
   static const _encoder = JsonEncoder.withIndent(null);
+  static bool _initFlag = false; //初始化标志
 
   static PrintFilter? _filter;
   static _LogColor _colorV = _LogColor.rgb(187, 187, 187);
@@ -26,10 +29,16 @@ class XLogger {
   static _LogColor _colorE = _LogColor.rgb(187, 0, 0);
 
   static void setEnable(bool enable) {
+    if (_initFlag) {
+      throw UnsupportedError('该方法必须在init之前调用');
+    }
     _enable = enable;
   }
 
   static void setLogColor(Level level, Color color) {
+    if (_initFlag) {
+      throw UnsupportedError('该方法必须在init之前调用');
+    }
     if (level == Level.V) {
       _colorV = _LogColor.color(color);
       return;
@@ -53,11 +62,19 @@ class XLogger {
   }
 
   static void setFilter(PrintFilter? filter) {
+    if (_initFlag) {
+      throw UnsupportedError('该方法必须在init之前调用');
+    }
     _filter = filter;
   }
 
-  static void init(String aseKey, String aesIv, {int maxFileLen = 2 * 1024 * 1024 * 1024}) {
-    _FlutterLogan.init(aseKey, aesIv, maxFileLen);
+  static Future<bool> init(String aseKey, String aesIv, {int maxFileLen = 2 * 1024 * 1024 * 1024}) {
+    if (_initFlag) {
+      print('已经初始化过了，不需要再次初始化');
+      return Future.value(true);
+    }
+    _initFlag = true;
+    return _FlutterLogan.init(aseKey, aesIv, maxFileLen);
   }
 
   ///返回给定时间对应的日志文件地址
@@ -87,29 +104,33 @@ class XLogger {
     await _FlutterLogan.cleanAllLogs();
   }
 
-  static void v(dynamic content, {bool saveToFile = false, String? tag}) {
-    _printLog(Level.V, tag, content, saveToFile);
+  static Future<void> v(dynamic content, {bool saveToFile = false, String? tag}) {
+    return _printLog(Level.V, tag, content, saveToFile);
   }
 
-  static void d(dynamic content, {bool saveToFile = false, String? tag}) {
-    _printLog(Level.D, tag, content, saveToFile);
+  static Future<void> d(dynamic content, {bool saveToFile = false, String? tag}) {
+    return _printLog(Level.D, tag, content, saveToFile);
   }
 
-  static void i(dynamic content, {bool saveToFile = false, String? tag}) {
-    _printLog(Level.I, tag, content, saveToFile);
+  static Future<void> i(dynamic content, {bool saveToFile = false, String? tag}) {
+    return _printLog(Level.I, tag, content, saveToFile);
   }
 
-  static void w(dynamic content, {bool saveToFile = false, String? tag}) {
-    _printLog(Level.W, tag, content, saveToFile);
+  static Future<void> w(dynamic content, {bool saveToFile = false, String? tag}) {
+    return _printLog(Level.W, tag, content, saveToFile);
   }
 
-  static void e(dynamic content, {bool saveToFile = false, String? tag}) {
-    _printLog(Level.E, tag, content, saveToFile);
+  static Future<void> e(dynamic content, {bool saveToFile = false, String? tag}) {
+    return _printLog(Level.E, tag, content, saveToFile);
   }
 
-  static void _printLog(Level level, String? tag, dynamic content, bool saveToFile) {
-    if (saveToFile) {
-      _FlutterLogan.log(1, content);
+  static Future<void> _printLog(Level level, String? tag, dynamic content, bool saveToFile) async {
+    if (saveToFile && _initFlag) {
+      try {
+        await _FlutterLogan.log(1, content);
+      } catch (e) {
+        print(e);
+      }
     }
     if (!_enable) {
       return;
@@ -130,7 +151,7 @@ class XLogger {
     } else if (level == Level.E) {
       color = _colorE.getHead();
     }
-    _printDetail(_convertLog(_stringifyMessage(content)), color);
+    _printDetail(_convertLog2(_stringifyMessage(content)), color);
   }
 
   //转为字符串
@@ -143,7 +164,8 @@ class XLogger {
     }
   }
 
-  ///转换并处理超长字符串，比如在Android 上 超过4096个字符的数据会被截断
+  ///转换并处理超长字符串，比如在原生Android 上 超过4096个字符的数据会被截断
+  ///为了避免这种情况需要进行单独处理
   static List<String> _convertLog(String log) {
     List<String> list = List.empty(growable: true);
     int lineMaxCount = 0; //记录日志中最长行的宽度 //必须小于4096
@@ -221,17 +243,97 @@ class XLogger {
     return resultList;
   }
 
-  static void _printDetail(List<String> list, String color) {
-    int i = 0;
-    for (var s in list) {
-      if (i == 0) {
-        print('$color$s');
-      } else if (i == list.length - 1) {
-        print("$s${_LogColor.ansiDefault}");
-      } else {
-        print(s);
+  static List<String> _convertLog2(String log) {
+    List<String> list = List.empty(growable: true);
+    int lineMaxCount = 0; //记录日志中最长行的宽度 //必须小于4096
+    List<String> tempList = log.split(RegExp.escape('\n'));
+    for (var s in tempList) {
+      int sl = s.length;
+      if (sl <= _lineMax) {
+        list.add(s);
+        if (sl > lineMaxCount) {
+          lineMaxCount = sl;
+        }
+        continue;
       }
-      i++;
+      Characters characters = s.characters;
+      while (characters.length > _lineMax) {
+        list.add(characters.getRange(0, _lineMax).toString());
+        characters = characters.getRange(_lineMax, characters.length);
+        if (lineMaxCount < _lineMax) {
+          lineMaxCount = _lineMax;
+        }
+      }
+      String sc = characters.toString();
+      if (sc.isNotEmpty) {
+        list.add(sc);
+        if (sc.length > lineMaxCount) {
+          lineMaxCount = sc.length;
+        }
+      }
+    }
+
+    //调用栈处理
+    String staceInfo = "暂无调用帧";
+    var chain = Chain.current();
+    chain = chain.foldFrames((frame) => frame.isCore || frame.package == "flutter");
+    final frames = chain.toTrace().frames;
+    final idx = frames.indexWhere((element) => !element.library.contains("XLogger"));
+    if (idx == -1 || idx + 1 >= frames.length) {
+    } else {
+      final frame = frames[idx];
+      staceInfo = "${frame.library}(${frame.line})";
+    }
+    if (staceInfo.length > lineMaxCount) {
+      lineMaxCount = staceInfo.length;
+    }
+
+    //数据拼接
+    List<String> resultList = List.empty(growable: true);
+
+    StringBuffer buffer = StringBuffer(_topLeftCorner); //临时处理
+
+    //确定分割线宽度
+    int lineWidth = lineMaxCount + 2;
+    if (lineWidth > 150) {
+      lineWidth = 150;
+    }
+
+    //添加顶部分割线
+    for (int i = 0; i < lineWidth; i++) {
+      buffer.write(_doubleDivider);
+    }
+    resultList.add(buffer.toString());
+    buffer.clear();
+    //添加帧栈和其分割线
+    buffer.write(_verticalLine);
+    buffer.write(" $staceInfo");
+    resultList.add(buffer.toString());
+    buffer.clear();
+    //添加内容和帧栈之间的分割线
+    buffer.write(_middleCorner);
+    for (int i = 0; i < lineWidth; i++) {
+      buffer.write(_singleDivider);
+    }
+    resultList.add(buffer.toString());
+    buffer.clear();
+
+    //添加内容和实际的行分割
+    for (var s in list) {
+      resultList.add("$_verticalLine $s");
+    }
+    //添加底部分割线
+    buffer.write(_bottomLeftCorner);
+    for (int i = 0; i < lineWidth; i++) {
+      buffer.write(_doubleDivider);
+    }
+    resultList.add(buffer.toString());
+    return resultList;
+  }
+
+  static void _printDetail(List<String> list, String color) {
+    for (var s in list) {
+      print("$color$s${_LogColor.ansiDefault}");
     }
   }
 }

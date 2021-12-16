@@ -15,7 +15,8 @@
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
 	SEL sel = NSSelectorFromString([call.method stringByAppendingString:@":result:"]);
 	if(sel && [self respondsToSelector:sel]){
-		((void(*)(id,SEL,...))objc_msgSend)(self,sel,call.arguments,result);
+    ((void(*)(id,SEL,NSDictionary *,FlutterResult))objc_msgSend)(self,sel,call.arguments,result);
+	//((void(*)(id,SEL,...))objc_msgSend)(self,sel,call.arguments,result);//SDK原始代码会报错
 	}else{
 		result(FlutterMethodNotImplemented);
 	}

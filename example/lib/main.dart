@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:xlogger/xlogger.dart';
 
@@ -16,7 +18,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    XLogger.init("0102030405060708", '0102030405060708');
+    XLogger.init("1111111122222222", '1111111122222222');
   }
 
   @override
@@ -51,23 +53,95 @@ class _MyAppState extends State<MyApp> {
                 child: const Text('pE')),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.getLog(DateTime.now()).then((value) {
-                    print("获取今天日志：${value.path}");
-                  });
+                  StringBuffer bu = StringBuffer('超大日志');
+                  Random random = Random();
+                  List<String> list = [
+                    'a',
+                    'b',
+                    'c',
+                    'd',
+                    'e',
+                    'f',
+                    'g',
+                    'h',
+                    'i',
+                    'j',
+                    'k',
+                    'l',
+                    'm',
+                    'n',
+                    'o',
+                    'p',
+                    'q',
+                    'r',
+                    's',
+                    't',
+                    'u',
+                    'v',
+                    'w',
+                    'x',
+                    'y',
+                    'z',
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5',
+                    '6',
+                    '7',
+                    '8',
+                    '9',
+                    '0',
+                    'A',
+                    'B',
+                    'C',
+                    'D',
+                    'E',
+                    'F',
+                    'G',
+                    'H',
+                    'I',
+                    'J',
+                    'K',
+                    'L',
+                    'M',
+                    'N',
+                    'O',
+                    'P',
+                    'Q',
+                    'R',
+                    'S',
+                    'T',
+                    'U',
+                    'V',
+                    'W',
+                    'X',
+                    'Y',
+                    'Z'
+                  ];
+                  for (int i = 0; i < 1024 * 9; i++) {
+                    int index = (random.nextDouble() * list.length).toInt();
+                    if (index >= list.length) {
+                      index = list.length - 1;
+                    }
+                    bu.write(list[index]);
+                  }
+                  XLogger.w(bu.toString());
                 },
-                child: const Text('get')),
+                child: const Text('large')),
             ElevatedButton(
                 onPressed: () {
                   XLogger.getAllLogs().then((value) {
-                    StringBuffer buffer=StringBuffer("获取所有日志\n");
+                    StringBuffer buffer = StringBuffer("获取所有日志\n");
                     for (var element in value) {
-                      buffer..write(element.path)..write("\n");
+                      buffer
+                        ..write(element.path)
+                        ..write("\n");
                     }
                     print(buffer.toString());
                   });
                 },
                 child: const Text('getAll')),
-
             ElevatedButton(
                 onPressed: () {
                   XLogger.cleanAllLogs();
