@@ -1,15 +1,50 @@
 # xlogger
 
-A new Flutter project.
+轻量、美观强大的Flutter日志库，可同时将日志打印在如 Logcat、Console 和文件(MMKV)中。
+支持超大字符串、自定义日志颜色、是否保存到本地等功能
+
+# Input
 
 ## Getting Started
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+## Install
+在你的 pubspec.yaml 文件中添加以下代码
+'''
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+'''
+## Init
+'''
+@override
+void initState() { 
+  super.initState();
+  // the aesKey and aesIv length always 16
+  XLogger.init(XLoggerConfig('aesKey', 'aesIv', true, false));
+}
+'''
+## Use
+
+'''
+//print Debug Log
+XLogger.d("debug log", saveToFile: false,tag:"LogTag");
+
+//print Info Log
+XLogger.i("debug log", saveToFile: false,tag:"LogTag");
+
+//print Warning Log
+XLogger.w("debug log", saveToFile: false,tag:"LogTag");
+
+//print Error Log
+XLogger.e("debug log", saveToFile: false,tag:"LogTag");
+
+//print Verbose Log
+XLogger.v("debug log", saveToFile: false,tag:"LogTag");
+
+在 所有方法中 saveToFile 和 tag 是可选的；saveToFile default false  tag default is Null;
+'''
+
+## Other Config
+其它高级配置请查看XloggerConfig代码
+
+
+
 

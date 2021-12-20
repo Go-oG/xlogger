@@ -1,80 +1,43 @@
-library xlogger;
-
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:stack_trace/stack_trace.dart';
+import 'package:xlogger/log_config.dart';
+import 'package:xlogger/xlogger_color.dart';
+
+export 'package:xlogger/xlogger.dart' show XLogger, PrintFilter, Level;
+export 'package:xlogger/log_config.dart' show XLoggerConfig;
 
 class XLogger {
-  static const _lineMax = 3 * 1024; //一行最多好多个字符(用于处理)
   static const _topLeftCorner = '┌';
   static const _bottomLeftCorner = '└';
   static const _middleCorner = '├';
   static const _verticalLine = '│';
   static const _doubleDivider = '─';
-  static const _singleDivider = '┄';
+  static const _encoder = JsonEncoder.withIndent('\t');
 
-  static bool _enable = true;
-  static const _encoder = JsonEncoder.withIndent(null);
-  static bool _initFlag = false; //初始化标志
+  ///用于正则判断是否为中宽字符
+  static final chineseRegex = RegExp('[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]');
 
-  static PrintFilter? _filter;
-  static _LogColor _colorV = _LogColor.rgb(187, 187, 187);
-  static _LogColor _colorD = _LogColor.rgb(37, 188, 36);
-  static _LogColor _colorI = _LogColor.rgb(255, 255, 0);
-  static _LogColor _colorW = _LogColor.rgb(255, 85, 85);
-  static _LogColor _colorE = _LogColor.rgb(187, 0, 0);
+  ///用于判断是否为Emoji
+  static final emojiRegex = RegExp('(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])');
 
-  static void setEnable(bool enable) {
-    if (_initFlag) {
-      throw UnsupportedError('该方法必须在init之前调用');
-    }
-    _enable = enable;
-  }
+  ///匹配英文字符
+  static final englishRegex = RegExp('[\x20-\x7E\\\\]');
 
-  static void setLogColor(Level level, Color color) {
-    if (_initFlag) {
-      throw UnsupportedError('该方法必须在init之前调用');
-    }
-    if (level == Level.V) {
-      _colorV = _LogColor.color(color);
-      return;
-    }
-    if (level == Level.D) {
-      _colorD = _LogColor.color(color);
-      return;
-    }
-    if (level == Level.I) {
-      _colorI = _LogColor.color(color);
-      return;
-    }
-    if (level == Level.W) {
-      _colorW = _LogColor.color(color);
-      return;
-    }
-    if (level == Level.E) {
-      _colorE = _LogColor.color(color);
-      return;
-    }
-  }
+  static late final XLoggerConfig _config;
 
-  static void setFilter(PrintFilter? filter) {
-    if (_initFlag) {
-      throw UnsupportedError('该方法必须在init之前调用');
-    }
-    _filter = filter;
-  }
-
-  static Future<bool> init(String aseKey, String aesIv, {int maxFileLen = 2 * 1024 * 1024 * 1024}) {
-    if (_initFlag) {
-      print('已经初始化过了，不需要再次初始化');
+  static Future<bool> init(XLoggerConfig config) {
+    try {
+      _config.aesIv;
+      debugPrint('已经初始化过了，不需要再次初始化');
       return Future.value(true);
+    } catch (error) {
+      _config = config;
+      return _FlutterLogan.init(config.aseKey, config.aesIv, config.maxFileLength);
     }
-    _initFlag = true;
-    return _FlutterLogan.init(aseKey, aesIv, maxFileLen);
   }
 
   ///返回给定时间对应的日志文件地址
@@ -105,53 +68,48 @@ class XLogger {
   }
 
   static Future<void> v(dynamic content, {bool saveToFile = false, String? tag}) {
-    return _printLog(Level.V, tag, content, saveToFile);
+    return _printLog(Level.V, _config.getVerbaseColor(), tag, content, saveToFile, StackTrace.current);
   }
 
   static Future<void> d(dynamic content, {bool saveToFile = false, String? tag}) {
-    return _printLog(Level.D, tag, content, saveToFile);
+    return _printLog(Level.D, _config.getDebugColor(), tag, content, saveToFile, StackTrace.current);
   }
 
   static Future<void> i(dynamic content, {bool saveToFile = false, String? tag}) {
-    return _printLog(Level.I, tag, content, saveToFile);
+    return _printLog(Level.I, _config.getInfoColor(), tag, content, saveToFile, StackTrace.current);
   }
 
   static Future<void> w(dynamic content, {bool saveToFile = false, String? tag}) {
-    return _printLog(Level.W, tag, content, saveToFile);
+    return _printLog(Level.W, _config.getWarningColor(), tag, content, saveToFile, StackTrace.current);
   }
 
   static Future<void> e(dynamic content, {bool saveToFile = false, String? tag}) {
-    return _printLog(Level.E, tag, content, saveToFile);
+    return _printLog(Level.E, _config.getErrorColor(), tag, content, saveToFile, StackTrace.current);
   }
 
-  static Future<void> _printLog(Level level, String? tag, dynamic content, bool saveToFile) async {
-    if (saveToFile && _initFlag) {
+  static Future<void> _printLog(
+      Level level, XLoggerColor color, String? tag, dynamic content, bool saveToFile, StackTrace stackTrace) async {
+    if (saveToFile) {
       try {
         await _FlutterLogan.log(1, content);
-      } catch (e) {
-        print(e);
+      } catch (error) {
+        debugPrint(error.toString(), wrapWidth: 120);
       }
     }
-    if (!_enable) {
+    if (!_config.enablePrint) {
       return;
     }
-    if (_filter != null) {
-      bool filt = _filter!.filter(level, content, tag);
+    if (_config.filter != null) {
+      bool filt = _config.filter!.filter(level, content, tag);
       if (filt) {
         return;
       }
     }
-    String color = _colorD.getHead();
-    if (level == Level.V) {
-      color = _colorV.getHead();
-    } else if (level == Level.I) {
-      color = _colorI.getHead();
-    } else if (level == Level.W) {
-      color = _colorW.getHead();
-    } else if (level == Level.E) {
-      color = _colorE.getHead();
+
+    List<String> list = _handleLog(_stringifyMessage(content), tag, stackTrace);
+    for (var s in list) {
+      print("${color.getStrPre()}$s${XLoggerColor.ansiDefault}");
     }
-    _printDetail(_convertLog2(_stringifyMessage(content)), color);
   }
 
   //转为字符串
@@ -164,177 +122,225 @@ class XLogger {
     }
   }
 
-  ///转换并处理超长字符串，比如在原生Android 上 超过4096个字符的数据会被截断
-  ///为了避免这种情况需要进行单独处理
-  static List<String> _convertLog(String log) {
-    List<String> list = List.empty(growable: true);
-    int lineMaxCount = 0; //记录日志中最长行的宽度 //必须小于4096
-    List<String> tempList = log.split(RegExp.escape('\n'));
-    for (var s in tempList) {
-      int sl = s.length;
-      if (sl <= _lineMax) {
-        list.add(s);
-        if (sl > lineMaxCount) {
-          lineMaxCount = sl;
-        }
-        continue;
-      }
-      Characters characters = s.characters;
-      while (characters.length > _lineMax) {
-        list.add(characters.getRange(0, _lineMax).toString());
-        characters = characters.getRange(_lineMax, characters.length);
-        if (lineMaxCount < _lineMax) {
-          lineMaxCount = _lineMax;
-        }
-      }
-      String sc = characters.toString();
-      if (sc.isNotEmpty) {
-        list.add(sc);
-        if (sc.length > lineMaxCount) {
-          lineMaxCount = sc.length;
-        }
-      }
-    }
+  //生成对应的行数据
+  static List<String> _handleLog(String log, String? tag, StackTrace stackTrace) {
+    List<String> contentList = _splitLargeLog(log, _config.lineMaxLength); //日志数据
+    List<String> stackTraceList = _getStrackInfo(stackTrace, _config.staticOffset, _config.methodCount); //帧栈数据
 
-    //调用栈处理
-    String staceInfo = "暂无调用帧";
-    var chain = Chain.current();
-    chain = chain.foldFrames((frame) => frame.isCore || frame.package == "flutter");
-    final frames = chain.toTrace().frames;
-    final idx = frames.indexWhere((element) => !element.library.contains("logger2/logger.dart"));
-    if (idx == -1 || idx + 1 >= frames.length) {
-    } else {
-      final frame = frames[idx];
-      staceInfo = "${frame.library}(${frame.line})";
+    //计算分割线的宽度
+    int diverLength = 0;
+    for (var element in contentList) {
+      if (element.length > diverLength) {
+        diverLength = element.length;
+      }
     }
-    if (staceInfo.length > lineMaxCount) {
-      lineMaxCount = staceInfo.length;
+    for (var element in stackTraceList) {
+      if (element.length > diverLength) {
+        diverLength = element.length;
+      }
+    }
+    diverLength += 4;
+    if (diverLength > _config.lineMaxLength + 4) {
+      diverLength = _config.lineMaxLength + 4;
     }
 
     //数据拼接
     List<String> resultList = List.empty(growable: true);
+    //临时处理字符
     StringBuffer buffer = StringBuffer(_topLeftCorner);
-    for (int i = 0; i < lineMaxCount + 2; i++) {
-      buffer.write(_doubleDivider);
-    }
-    resultList.add(buffer.toString());
-    buffer.clear();
-    buffer.write(_verticalLine);
-    buffer.write(" $staceInfo");
-
-    resultList.add(buffer.toString());
-    buffer.clear();
-
-    buffer.write(_middleCorner);
-    for (int i = 0; i < lineMaxCount + 2; i++) {
-      buffer.write(_singleDivider);
-    }
-    resultList.add(buffer.toString());
-    buffer.clear();
-
-    for (var s in list) {
-      resultList.add("$_verticalLine $s");
-    }
-    buffer.write(_bottomLeftCorner);
-    for (int i = 0; i < lineMaxCount + 2; i++) {
-      buffer.write(_doubleDivider);
-    }
-    resultList.add(buffer.toString());
-    return resultList;
-  }
-
-  static List<String> _convertLog2(String log) {
-    List<String> list = List.empty(growable: true);
-    int lineMaxCount = 0; //记录日志中最长行的宽度 //必须小于4096
-    List<String> tempList = log.split(RegExp.escape('\n'));
-    for (var s in tempList) {
-      int sl = s.length;
-      if (sl <= _lineMax) {
-        list.add(s);
-        if (sl > lineMaxCount) {
-          lineMaxCount = sl;
-        }
-        continue;
-      }
-      Characters characters = s.characters;
-      while (characters.length > _lineMax) {
-        list.add(characters.getRange(0, _lineMax).toString());
-        characters = characters.getRange(_lineMax, characters.length);
-        if (lineMaxCount < _lineMax) {
-          lineMaxCount = _lineMax;
-        }
-      }
-      String sc = characters.toString();
-      if (sc.isNotEmpty) {
-        list.add(sc);
-        if (sc.length > lineMaxCount) {
-          lineMaxCount = sc.length;
-        }
-      }
-    }
-
-    //调用栈处理
-    String staceInfo = "暂无调用帧";
-    var chain = Chain.current();
-    chain = chain.foldFrames((frame) => frame.isCore || frame.package == "flutter");
-    final frames = chain.toTrace().frames;
-    final idx = frames.indexWhere((element) => !element.library.contains("XLogger"));
-    if (idx == -1 || idx + 1 >= frames.length) {
-    } else {
-      final frame = frames[idx];
-      staceInfo = "${frame.library}(${frame.line})";
-    }
-    if (staceInfo.length > lineMaxCount) {
-      lineMaxCount = staceInfo.length;
-    }
-
-    //数据拼接
-    List<String> resultList = List.empty(growable: true);
-
-    StringBuffer buffer = StringBuffer(_topLeftCorner); //临时处理
-
-    //确定分割线宽度
-    int lineWidth = lineMaxCount + 2;
-    if (lineWidth > 150) {
-      lineWidth = 150;
-    }
 
     //添加顶部分割线
-    for (int i = 0; i < lineWidth; i++) {
+    for (int i = 0; i < diverLength; i++) {
       buffer.write(_doubleDivider);
     }
     resultList.add(buffer.toString());
     buffer.clear();
-    //添加帧栈和其分割线
-    buffer.write(_verticalLine);
-    buffer.write(" $staceInfo");
-    resultList.add(buffer.toString());
-    buffer.clear();
-    //添加内容和帧栈之间的分割线
-    buffer.write(_middleCorner);
-    for (int i = 0; i < lineWidth; i++) {
-      buffer.write(_singleDivider);
-    }
-    resultList.add(buffer.toString());
-    buffer.clear();
 
-    //添加内容和实际的行分割
-    for (var s in list) {
+    //处理 Tag
+    if (tag != null && tag.isNotEmpty) {
+      resultList.add(_verticalLine + "TAG: $tag");
+      buffer.write(_middleCorner);
+      for (int i = 0; i < diverLength; i++) {
+        buffer.write('─');
+      }
+      resultList.add(buffer.toString());
+      buffer.clear();
+    }
+
+    //添加帧栈内容
+    if (stackTraceList.isNotEmpty) {
+      for (var value in stackTraceList) {
+        resultList.add(_verticalLine + value);
+      }
+      //添加内容和帧栈之间的分割线
+      buffer.write(_middleCorner);
+      for (int i = 0; i < diverLength; i++) {
+        buffer.write('─');
+      }
+      resultList.add(buffer.toString());
+      buffer.clear();
+    }
+
+    //添加日志内容和实际的行分割
+    for (var s in contentList) {
       resultList.add("$_verticalLine $s");
     }
     //添加底部分割线
     buffer.write(_bottomLeftCorner);
-    for (int i = 0; i < lineWidth; i++) {
+    for (int i = 0; i < diverLength; i++) {
       buffer.write(_doubleDivider);
     }
     resultList.add(buffer.toString());
     return resultList;
   }
 
-  static void _printDetail(List<String> list, String color) {
-    for (var s in list) {
-      print("$color$s${_LogColor.ansiDefault}");
+  //解析调用栈并生成对应样式字符串列表
+  static List<String> _getStrackInfo(StackTrace trace, int methodOffset, int methodCount) {
+    if (methodOffset < 0) {
+      methodOffset = 0;
     }
+    if (methodCount <= 0) {
+      methodCount = 1;
+    }
+    var chain = Chain.forTrace(trace);
+    int offset = methodOffset;
+    List<Frame> frameList = [];
+    for (var value in chain.traces) {
+      for (var v2 in value.frames) {
+        //过滤掉自身的
+        if (v2.location.contains('xlogger/xlogger.dart')) {
+          continue;
+        }
+        if (offset <= 0) {
+          frameList.add(v2);
+        }
+        offset--;
+        if (frameList.length >= methodCount) {
+          break;
+        }
+      }
+      if (frameList.length >= methodCount) {
+        break;
+      }
+    }
+    List<String> resultList = [];
+    int tabCount = 0;
+
+    for (int i = 0; i < frameList.length; i++) {
+      var element = frameList[i];
+      String line = element.library;
+      if (element.line != null) {
+        line += ' ${element.line}';
+      }
+      String s;
+      if (element.member != null) {
+        s = "${element.member}($line)";
+      } else {
+        s = line;
+      }
+
+      for (int j = 0; j < tabCount; j++) {
+        s = " " + s; //这里没用\t 是避免多个\t造成的间距过大
+      }
+      resultList.add(s.replaceAll("\n", ''));
+      tabCount++;
+    }
+    return resultList;
+  }
+
+  //分割日志
+  static List<String> _splitLargeLog(String log, int lineMax) {
+    List<String> lineList = List.empty(growable: true); //存储分割后处理的数据
+    List<String> tempList = log.split(RegExp('\n')); //先按照换行符分割数据
+    RegExp tabReg = RegExp("\t");
+    int maxLength = 0; //记录日志中最长行的宽度
+    for (var s in tempList) {
+      int sl = s.length;
+      if (sl <= lineMax) {
+        lineList.add(s);
+        if (sl > maxLength) {
+          maxLength = sl;
+          Iterable<RegExpMatch> matchs = tabReg.allMatches(s);
+          int tSize = matchs.length;
+          maxLength += (tSize * 4); //Tab 长度4个字符
+        }
+        continue;
+      }
+      String tempS = s;
+      while (true) {
+        if (tempS.length <= lineMax ~/ 2) {
+          lineList.add(tempS);
+          tempS = '';
+          break;
+        }
+
+        List tL = _computeSpliIndex(tempS, lineMax);
+        String sp = tL[0];
+        lineList.add(sp);
+        if (sp.length == tempS.length) {
+          break;
+        }
+        tempS = tempS.substring(sp.length);
+        if (maxLength < tL[1]) {
+          maxLength = tL[1];
+          Iterable<RegExpMatch> matchs = tabReg.allMatches(sp);
+          int tSize = matchs.length;
+          maxLength += (tSize * 4);
+        }
+      }
+
+      while (tempS.length > lineMax) {}
+      if (tempS.isNotEmpty) {
+        lineList.add(tempS);
+      }
+    }
+    return lineList;
+  }
+
+  ///计算符合切割要求的位置(一个中文字符占2个位置，一个emoji等于一个中文字符宽度)
+  ///[s] 待分割字符串；[max]每行最多好多个字符
+  ///TODO 待优化
+  static List _computeSpliIndex(String s, int max) {
+    Characters characters = s.characters;
+    if (characters.length <= max ~/ 2) {
+      return [s, computeVirtualLength(s)];
+    }
+
+    String pre = characters.getRange(0, max ~/ 2 + 1).toString();
+    int realLength =computeVirtualLength(pre); //当前实时长度
+    int index = max ~/ 2 + 1;
+    while (realLength < max && index < characters.length) {
+      int remainCount = max - realLength;
+      if (remainCount >= 2) {
+        int oldIndex = index;
+        index += (remainCount ~/ 2+1);
+        String nodeStr = characters.getRange(oldIndex, index + 1).toString();
+        realLength += computeVirtualLength(nodeStr);
+      } else {
+        if (remainCount == 1) {
+          if (englishRegex.hasMatch(characters.elementAt(index + 1))) {
+            index += 1;
+            realLength += 1;
+            break;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (index >= 0 && index < characters.length) {
+      return [characters.getRange(0, index + 1).toString(), realLength];
+    }
+    return [s,computeVirtualLength(s)];
+  }
+
+  ///计算字符串虚拟长度
+  static int computeVirtualLength(String s) {
+    int englishCount = englishRegex.allMatches(s).length;
+    return s.characters.length*2-englishCount;
   }
 }
 
@@ -343,26 +349,6 @@ abstract class PrintFilter {
 }
 
 enum Level { V, D, I, W, E }
-
-class _LogColor {
-  static const ansiEsc = '\x1B[38;2;';
-  static const ansiDefault = '\x1B[0m';
-  late final int r;
-  late final int g;
-  late final int b;
-
-  _LogColor.rgb(this.r, this.g, this.b);
-
-  _LogColor.color(Color color) {
-    r = color.red;
-    g = color.green;
-    b = color.blue;
-  }
-
-  String getHead() {
-    return "$ansiEsc$r;$g;${b}m";
-  }
-}
 
 class _FlutterLogan {
   static const MethodChannel _channel = MethodChannel('flutter_logan');

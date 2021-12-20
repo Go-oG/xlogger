@@ -1,3 +1,3 @@
-## 0.0.1
 
-* TODO: Describe initial release.
+## 0.0.1
+* 创建项目并实现基本功能

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:xlogger/xlogger.dart';
+import 'package:xlogger_example/log_util.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,7 +19,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    XLogger.init("1111111122222222", '1111111122222222');
+    XLogger.init(XLoggerConfig('0000111100001111', '0000111100001111', true, false));
   }
 
   @override
@@ -33,93 +34,40 @@ class _MyAppState extends State<MyApp> {
             const SizedBox(height: 36),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.d("这是Debug级别日志", saveToFile: true);
+                  XLogger.d("This is the Debug Level Log", saveToFile: true);
                 },
                 child: const Text('pD')),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.i("这是Info级别日志", saveToFile: true);
+                  LogUtil.i(
+                    "This is the info Level Log",
+                  );
                 },
                 child: const Text('pI')),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.w("这是Warning级别日志", saveToFile: true);
+                  Map<String,dynamic> json={};
+                  json["key1"]="test1";
+                  json["Key2"]=1;
+                  json["key3"]=2.30;
+                  json["key4"]=true;
+                  Map<String,dynamic> child={};
+                  child['childKey1']="child";
+                  child['childKey2']=234;
+                  json['key5']=child;
+                  XLogger.w(json, saveToFile: true, tag: "MainDart");
                 },
                 child: const Text('pW')),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.e("这是Error级别日志", saveToFile: true);
-                },
-                child: const Text('pE')),
-            ElevatedButton(
-                onPressed: () {
-                  StringBuffer bu = StringBuffer('超大日志');
+                  StringBuffer bu = StringBuffer();
                   Random random = Random();
                   List<String> list = [
-                    'a',
-                    'b',
-                    'c',
-                    'd',
-                    'e',
-                    'f',
-                    'g',
-                    'h',
-                    'i',
-                    'j',
-                    'k',
-                    'l',
-                    'm',
-                    'n',
-                    'o',
-                    'p',
-                    'q',
-                    'r',
-                    's',
-                    't',
-                    'u',
-                    'v',
-                    'w',
-                    'x',
-                    'y',
-                    'z',
-                    '1',
-                    '2',
-                    '3',
-                    '4',
-                    '5',
-                    '6',
-                    '7',
-                    '8',
-                    '9',
-                    '0',
-                    'A',
-                    'B',
-                    'C',
-                    'D',
-                    'E',
-                    'F',
-                    'G',
-                    'H',
-                    'I',
-                    'J',
-                    'K',
-                    'L',
-                    'M',
-                    'N',
-                    'O',
-                    'P',
-                    'Q',
-                    'R',
-                    'S',
-                    'T',
-                    'U',
-                    'V',
-                    'W',
-                    'X',
-                    'Y',
-                    'Z'
+                    'abcd',
+                    '😀😃😄😁'
+                    '测试Large',
                   ];
-                  for (int i = 0; i < 1024 * 9; i++) {
+                  for (int i = 0; i < 46; i++) {
                     int index = (random.nextDouble() * list.length).toInt();
                     if (index >= list.length) {
                       index = list.length - 1;
@@ -142,11 +90,6 @@ class _MyAppState extends State<MyApp> {
                   });
                 },
                 child: const Text('getAll')),
-            ElevatedButton(
-                onPressed: () {
-                  XLogger.cleanAllLogs();
-                },
-                child: const Text('clearAll')),
           ],
         ),
       ),
