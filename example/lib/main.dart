@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:xlogger/xlogger.dart';
-import 'package:xlogger_example/log_util.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,7 +38,7 @@ class _MyAppState extends State<MyApp> {
                 child: const Text('pD')),
             ElevatedButton(
                 onPressed: () {
-                  LogUtil.i(
+                  XLogger.i(
                     "This is the info Level Log",
                   );
                 },
@@ -57,7 +56,7 @@ class _MyAppState extends State<MyApp> {
                   json['key5']=child;
                   XLogger.w(json, saveToFile: true, tag: "MainDart");
                 },
-                child: const Text('pW')),
+                child: const Text('pjson')),
             ElevatedButton(
                 onPressed: () {
                   StringBuffer bu = StringBuffer();

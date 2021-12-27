@@ -18,12 +18,6 @@ class XLogger {
   static const _doubleDivider = '─';
   static const _encoder = JsonEncoder.withIndent('\t');
 
-  ///用于正则判断是否为中宽字符
-  static final chineseRegex = RegExp('[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]');
-
-  ///用于判断是否为Emoji
-  static final emojiRegex = RegExp('(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])');
-
   ///匹配英文字符
   static final englishRegex = RegExp('[\x20-\x7E\\\\]');
 
@@ -47,6 +41,15 @@ class XLogger {
     return File(path);
   }
 
+  static Future<bool> deleteLog(DateTime dateTime) async{
+    File file=await getLog(dateTime);
+    if(!file.existsSync()){
+      return false;
+    }
+    file.deleteSync();
+    return true;
+  }
+
   static Future<List<File>> getAllLogs() async {
     final List<String> paths = await _FlutterLogan.getAllLogs();
     List<File> fileList = [];
@@ -56,7 +59,7 @@ class XLogger {
         fileList.add(file);
       }
     }
-    return Future.value(fileList);
+    return fileList;
   }
 
   static Future<void> flush() async {
@@ -93,7 +96,7 @@ class XLogger {
       try {
         await _FlutterLogan.log(1, content);
       } catch (error) {
-        debugPrint(error.toString(), wrapWidth: 120);
+        debugPrint(error.toString(), wrapWidth: 125);
       }
     }
     if (!_config.enablePrint) {

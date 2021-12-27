@@ -30,13 +30,10 @@ class LoganParser {
       if (start != '\u000E'.codeUnitAt(0)) {
         continue;
       }
-
       i++;
       int length = (content[i] & 0xFF) << 24 | (content[i + 1] & 0xFF) << 16 | (content[i + 2] & 0xFF) << 8 | (content[i + 3] & 0xFF);
-
       i += 3;
       int type;
-
       if (length > 0) {
         int temp = i + length + 1;
         if (content.length - i - 1 == length) {
@@ -87,4 +84,5 @@ class LoganParser {
     String result = String.fromCharCodes(resultBuffer.toBytes());
     return Future.value(result);
   }
+
 }
