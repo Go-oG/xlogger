@@ -39,7 +39,7 @@ XLogger.e("debug log", saveToFile: false,tag:"LogTag");
 //print Verbose Log
 XLogger.v("debug log", saveToFile: false,tag:"LogTag");
 
-在 所有方法中 saveToFile 和 tag 是可选的；saveToFile default false  tag default is Null;
+在 所有方法中 saveToFile 和 tag 是可选的；saveToFile default is false  tag default is Null;
 '''
 
 ## Other Config
