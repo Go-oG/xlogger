@@ -210,22 +210,22 @@ public class XloggerPlugin implements FlutterPlugin, MethodCallHandler {
     //获取所有的日志文件
     private void getAllLogs(Result result) {
         if (Utils.isEmpty(mLoganFilePath)) {
-            result.success("");
+            result.success(new ArrayList<>());
             return;
         }
         checkAndInitExecutor();
         sExecutor.execute(() -> {
             File dir = new File(mLoganFilePath);
             if (!dir.exists()) {
-                replyOnMainThread(result, "");
+                replyOnMainThread(result, new ArrayList<>());
                 return;
             }
             File[] files = dir.listFiles();
             if (files == null) {
-                replyOnMainThread(result, "");
+                replyOnMainThread(result, new ArrayList<>());
                 return;
             }
-            List<String> pathList=new ArrayList<>();
+            ArrayList<String> pathList=new ArrayList<>();
             for (File file : files) {
                 pathList.add(file.getAbsolutePath());
             }

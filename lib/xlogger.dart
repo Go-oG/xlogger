@@ -41,9 +41,9 @@ class XLogger {
     return File(path);
   }
 
-  static Future<bool> deleteLog(DateTime dateTime) async{
-    File file=await getLog(dateTime);
-    if(!file.existsSync()){
+  static Future<bool> deleteLog(DateTime dateTime) async {
+    File file = await getLog(dateTime);
+    if (!file.existsSync()) {
       return false;
     }
     file.deleteSync();
@@ -70,28 +70,29 @@ class XLogger {
     await _FlutterLogan.cleanAllLogs();
   }
 
-  static Future<void> v(dynamic content, {bool saveToFile = false, String? tag}) {
+  static Future<void> v(dynamic content, {bool? saveToFile, String? tag}) {
     return _printLog(Level.V, _config.getVerbaseColor(), tag, content, saveToFile, StackTrace.current);
   }
 
-  static Future<void> d(dynamic content, {bool saveToFile = false, String? tag}) {
+  static Future<void> d(dynamic content, {bool? saveToFile, String? tag}) {
     return _printLog(Level.D, _config.getDebugColor(), tag, content, saveToFile, StackTrace.current);
   }
 
-  static Future<void> i(dynamic content, {bool saveToFile = false, String? tag}) {
+  static Future<void> i(dynamic content, {bool? saveToFile, String? tag}) {
     return _printLog(Level.I, _config.getInfoColor(), tag, content, saveToFile, StackTrace.current);
   }
 
-  static Future<void> w(dynamic content, {bool saveToFile = false, String? tag}) {
+  static Future<void> w(dynamic content, {bool? saveToFile, String? tag}) {
     return _printLog(Level.W, _config.getWarningColor(), tag, content, saveToFile, StackTrace.current);
   }
 
-  static Future<void> e(dynamic content, {bool saveToFile = false, String? tag}) {
+  static Future<void> e(dynamic content, {bool? saveToFile, String? tag}) {
     return _printLog(Level.E, _config.getErrorColor(), tag, content, saveToFile, StackTrace.current);
   }
 
   static Future<void> _printLog(
-      Level level, XLoggerColor color, String? tag, dynamic content, bool saveToFile, StackTrace stackTrace) async {
+      Level level, XLoggerColor color, String? tag, dynamic content, bool? saveToFile, StackTrace stackTrace) async {
+    saveToFile ??= _config.enableSave;
     if (saveToFile) {
       try {
         await _FlutterLogan.log(1, content);
@@ -302,7 +303,7 @@ class XLogger {
 
   ///计算符合切割要求的位置(一个中文字符占2个位置，一个emoji等于一个中文字符宽度)
   ///[s] 待分割字符串；[max]每行最多好多个字符
-  ///TODO 待优化
+  ///返回值[0] 为对应的字符串 [1]为字符串长度
   static List _computeSpliIndex(String s, int max) {
     Characters characters = s.characters;
     if (characters.length <= max ~/ 2) {
@@ -310,13 +311,13 @@ class XLogger {
     }
 
     String pre = characters.getRange(0, max ~/ 2 + 1).toString();
-    int realLength =computeVirtualLength(pre); //当前实时长度
+    int realLength = computeVirtualLength(pre); //当前实时长度
     int index = max ~/ 2 + 1;
     while (realLength < max && index < characters.length) {
       int remainCount = max - realLength;
       if (remainCount >= 2) {
         int oldIndex = index;
-        index += (remainCount ~/ 2+1);
+        index += (remainCount ~/ 2 + 1);
         String nodeStr = characters.getRange(oldIndex, index + 1).toString();
         realLength += computeVirtualLength(nodeStr);
       } else {
@@ -337,13 +338,13 @@ class XLogger {
     if (index >= 0 && index < characters.length) {
       return [characters.getRange(0, index + 1).toString(), realLength];
     }
-    return [s,computeVirtualLength(s)];
+    return [s, computeVirtualLength(s)];
   }
 
   ///计算字符串虚拟长度
   static int computeVirtualLength(String s) {
     int englishCount = englishRegex.allMatches(s).length;
-    return s.characters.length*2-englishCount;
+    return s.characters.length * 2 - englishCount;
   }
 }
 

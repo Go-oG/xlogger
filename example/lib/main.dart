@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:xlogger/log_parser.dart';
 import 'package:xlogger/xlogger.dart';
 
 void main() {
@@ -18,7 +20,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    XLogger.init(XLoggerConfig('0000111100001111', '0000111100001111', true, false));
+    XLogger.init(XLoggerConfig('0000111100001111', '0000111100001111', true, true));
   }
 
   @override
@@ -34,37 +36,39 @@ class _MyAppState extends State<MyApp> {
             ElevatedButton(
                 onPressed: () {
                   XLogger.d("This is the Debug Level Log", saveToFile: true);
+                  XLogger.flush();
                 },
                 child: const Text('pD')),
             ElevatedButton(
-                onPressed: () {
-                  XLogger.i(
+                onPressed: () async {
+                  await XLogger.i(
                     "This is the info Level Log",
                   );
+                  XLogger.flush();
                 },
                 child: const Text('pI')),
             ElevatedButton(
                 onPressed: () {
-                  Map<String,dynamic> json={};
-                  json["key1"]="test1";
-                  json["Key2"]=1;
-                  json["key3"]=2.30;
-                  json["key4"]=true;
-                  Map<String,dynamic> child={};
-                  child['childKey1']="child";
-                  child['childKey2']=234;
-                  json['key5']=child;
+                  Map<String, dynamic> json = {};
+                  json["key1"] = "test1";
+                  json["Key2"] = 1;
+                  json["key3"] = 2.30;
+                  json["key4"] = true;
+                  Map<String, dynamic> child = {};
+                  child['childKey1'] = "child";
+                  child['childKey2'] = 234;
+                  json['key5'] = child;
                   XLogger.w(json, saveToFile: true, tag: "MainDart");
                 },
                 child: const Text('pjson')),
             ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   StringBuffer bu = StringBuffer();
                   Random random = Random();
                   List<String> list = [
                     'abcd',
                     '😀😃😄😁'
-                    '测试Large',
+                        '测试Large',
                   ];
                   for (int i = 0; i < 46; i++) {
                     int index = (random.nextDouble() * list.length).toInt();
@@ -73,22 +77,26 @@ class _MyAppState extends State<MyApp> {
                     }
                     bu.write(list[index]);
                   }
-                  XLogger.w(bu.toString());
+                  await XLogger.w(bu.toString(), saveToFile: true);
+                  XLogger.flush();
                 },
                 child: const Text('large')),
             ElevatedButton(
                 onPressed: () {
-                  XLogger.getAllLogs().then((value) {
-                    StringBuffer buffer = StringBuffer("获取所有日志\n");
-                    for (var element in value) {
-                      buffer
-                        ..write(element.path)
-                        ..write("\n");
-                    }
-                    print(buffer.toString());
-                  });
+                  XLogger.cleanAllLogs();
                 },
-                child: const Text('getAll')),
+                child: const Text('Clear')),
+            ElevatedButton(
+                onPressed: () async {
+                  List<File> list = await XLogger.getAllLogs();
+                  if (list == null || list.isEmpty) {
+                    print("暂无相关日志");
+                    return;
+                  }
+                  String s = await LoganParser('0000111100001111', '0000111100001111').parse(list[list.length - 1]);
+                  print('解密日志：\n$s');
+                },
+                child: const Text('Parse'))
           ],
         ),
       ),
